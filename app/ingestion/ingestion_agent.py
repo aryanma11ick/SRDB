@@ -1,4 +1,3 @@
-from typing import List
 from app.ingestion.gmail_client import GmailClient
 from app.ingestion.email_parser import parse_gmail_message
 from db.db import get_db_connection
@@ -37,29 +36,17 @@ class IngestionAgent:
                 for msg in raw_messages:
                     parsed = parse_gmail_message(msg)
 
-                    if self._exists(cur, parsed["email_id"]):
-                        continue
-
-                    self._insert(cur, parsed)
-                    inserted_count += 1
+                    if self._insert(cur, parsed):
+                        inserted_count += 1
 
             conn.commit()
 
         return inserted_count
 
-    def _exists(self, cursor, email_id: str) -> bool:
-        """
-        Check if email already exists in DB.
-        """
-        cursor.execute(
-            "SELECT 1 FROM emails WHERE email_id = %s",
-            (email_id,)
-        )
-        return cursor.fetchone() is not None
-
-    def _insert(self, cursor, email: dict):
+    def _insert(self, cursor, email: dict) -> bool:
         """
         Insert parsed email into DB.
+        Relies on the primary key constraint on email_id to deduplicate.
         """
         cursor.execute(
             """
@@ -73,6 +60,8 @@ class IngestionAgent:
                 processed
             )
             VALUES (%s, %s, %s, %s, %s, %s, FALSE)
+            ON CONFLICT (email_id) DO NOTHING
+            RETURNING email_id
             """,
             (
                 email["email_id"],
@@ -83,3 +72,4 @@ class IngestionAgent:
                 email["received_at"],
             ),
         )
+        return cursor.fetchone() is not None
