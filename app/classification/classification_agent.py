@@ -99,7 +99,20 @@ class ClassificationAgent:
                 last_error = exc
                 continue
 
-        raise ValueError(f"LLM returned invalid JSON after retries: {last_error}")
+        # Safe fallback to avoid pipeline failure on transient LLM issues.
+        return self._rule_based_classify(body, last_error)
+
+    def _rule_based_classify(self, body: str, last_error=None) -> Dict:
+        text = (body or "").lower()
+        dispute_keywords = ("short payment", "underpayment", "overpayment", "missing payment", "dispute", "chargeback", "deduct", "deduction", "invoice mismatch", "incorrect invoice", "late payment", "unpaid", "not paid")
+        ambiguous_keywords = ("status", "update", "clarify", "when will", "follow up", "follow-up", "confirm", "check on", "pending")
+        error_reason = str(last_error) if last_error else "LLM unavailable"
+
+        if any(k in text for k in dispute_keywords):
+            return {"label": "dispute", "confidence": 0.55, "reason": "Rule-based: financial discrepancy keywords detected."}
+        if any(k in text for k in ambiguous_keywords):
+            return {"label": "ambiguous", "confidence": 0.4, "reason": "Rule-based: status/clarification language detected."}
+        return {"label": "non_dispute", "confidence": 0.35, "reason": f"Rule-based fallback due to LLM error: {error_reason}"}
 
     def _store_result(self, cursor, email_id: str, result: Dict):
         """
