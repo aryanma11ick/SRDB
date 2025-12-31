@@ -85,9 +85,9 @@ def main():
         top_k=top_k,
     )
     for r in results:
-        email_id = r.get("email_id") if isinstance(r, dict) else r[0]
+        dispute_id = r.get("dispute_id") if isinstance(r, dict) else r[0]
         sim = r.get("similarity") if isinstance(r, dict) else r[3]
-        print(f"  - email_id={email_id}, similarity={sim}")
+        print(f"  - dispute_id={dispute_id}, similarity={sim}")
 
 
 if __name__ == "__main__":

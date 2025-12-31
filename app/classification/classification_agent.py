@@ -128,7 +128,7 @@ class ClassificationAgent:
     def _fetch_email(self, cursor, email_id: str) -> dict:
         cursor.execute(
             """
-            SELECT email_id, thread_id, sender, subject, body, received_at
+            SELECT email_id, thread_id, sender, subject, body, received_at, supplier_id
             FROM emails
             WHERE email_id = %s
             """,

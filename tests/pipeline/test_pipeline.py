@@ -12,12 +12,34 @@ def _reset_tables():
     """Clean up any prior pipeline test rows."""
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("DELETE FROM dispute_documents WHERE email_id IN (%s, %s)", ("pipeline1", "pipeline2"))
+            cur.execute("DELETE FROM dispute_embeddings WHERE dispute_id IN (SELECT dispute_id FROM dispute_emails WHERE email_id IN (%s, %s))", ("pipeline1", "pipeline2"))
+            cur.execute("DELETE FROM dispute_documents WHERE dispute_id IN (SELECT dispute_id FROM dispute_emails WHERE email_id IN (%s, %s))", ("pipeline1", "pipeline2"))
+            cur.execute("DELETE FROM dispute_emails WHERE email_id IN (%s, %s)", ("pipeline1", "pipeline2"))
             cur.execute("DELETE FROM emails WHERE email_id IN (%s, %s)", ("pipeline1", "pipeline2"))
+            cur.execute("DELETE FROM canonical_disputes WHERE dispute_id NOT IN (SELECT dispute_id FROM dispute_emails)")
         conn.commit()
 
 
+def _default_supplier_id():
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT supplier_id FROM suppliers WHERE name = %s", ("Unknown Supplier",))
+            row = cur.fetchone()
+            if row:
+                return row["supplier_id"]
+            cur.execute(
+                "INSERT INTO suppliers (name) VALUES (%s) ON CONFLICT DO NOTHING RETURNING supplier_id",
+                ("Unknown Supplier",),
+            )
+            inserted = cur.fetchone()
+            if inserted:
+                return inserted["supplier_id"]
+            cur.execute("SELECT supplier_id FROM suppliers WHERE name = %s", ("Unknown Supplier",))
+            return cur.fetchone()["supplier_id"]
+
+
 def _seed_emails():
+    supplier_id = _default_supplier_id()
     sample_rows = [
         {
             "email_id": "pipeline1",
@@ -25,6 +47,7 @@ def _seed_emails():
             "sender": "ap@supplier.com",
             "subject": "Short payment on INV-100",
             "body": "Payment received short by 5,000. Please advise.",
+            "supplier_id": supplier_id,
         },
         {
             "email_id": "pipeline2",
@@ -32,6 +55,7 @@ def _seed_emails():
             "sender": "ap@supplier.com",
             "subject": "Invoice status",
             "body": "Following up on invoice INV-200 status.",
+            "supplier_id": supplier_id,
         },
     ]
 
@@ -41,9 +65,9 @@ def _seed_emails():
                 cur.execute(
                     """
                     INSERT INTO emails (
-                        email_id, thread_id, sender, subject, body, received_at, processed
+                        email_id, thread_id, sender, subject, body, received_at, processed, supplier_id
                     )
-                    VALUES (%s, %s, %s, %s, %s, NOW(), FALSE)
+                    VALUES (%s, %s, %s, %s, %s, NOW(), FALSE, %s)
                     ON CONFLICT (email_id) DO NOTHING
                     """,
                     (
@@ -52,6 +76,7 @@ def _seed_emails():
                         row["sender"],
                         row["subject"],
                         row["body"],
+                        row["supplier_id"],
                     ),
                 )
         conn.commit()
@@ -87,7 +112,7 @@ def test_end_to_end_classification_and_retrieval():
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    "SELECT email_id, thread_id, sender, subject, body, received_at FROM emails WHERE email_id IN (%s, %s)",
+                    "SELECT email_id, thread_id, sender, subject, body, received_at, supplier_id FROM emails WHERE email_id IN (%s, %s)",
                     ("pipeline1", "pipeline2"),
                 )
                 for row in cur.fetchall():
