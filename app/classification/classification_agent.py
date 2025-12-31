@@ -18,7 +18,7 @@ class ClassificationAgent:
         if not self.api_key:
             raise ValueError("Missing OPENAI_API_KEY; classification requires LLM access.")
         self.client = OpenAI(api_key=self.api_key)
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+        self.model = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 
     def classify_pending_emails(self, limit: int = 10) -> int:
         """
@@ -74,10 +74,9 @@ class ClassificationAgent:
                     {"role": "system", "content": "You are a strict JSON-only classifier."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.0,
                 timeout=15,
                 response_format={"type": "json_object"},
-                max_tokens=200,
+                max_completion_tokens=200,
             )
 
             if not response.choices or not response.choices[0].message:

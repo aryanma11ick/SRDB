@@ -84,10 +84,14 @@ def main():
         query_text="payment discrepancy",
         top_k=top_k,
     )
-    for r in results:
-        dispute_id = r.get("dispute_id") if isinstance(r, dict) else r[0]
-        sim = r.get("similarity") if isinstance(r, dict) else r[3]
-        print(f"  - dispute_id={dispute_id}, similarity={sim}")
+    if not results:
+        print("[pipeline] no results returned (do you have any dispute embeddings stored?)")
+    else:
+        print(f"[pipeline] retrieved {len(results)} results")
+        for r in results:
+            dispute_id = r.get("dispute_id") if isinstance(r, dict) else r[0]
+            sim = r.get("similarity") if isinstance(r, dict) else r[3]
+            print(f"  - dispute_id={dispute_id}, similarity={sim}")
 
 
 if __name__ == "__main__":
