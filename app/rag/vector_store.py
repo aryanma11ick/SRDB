@@ -1,5 +1,6 @@
 import os
 import logging
+from email.utils import parseaddr
 from typing import Iterable
 from db.db import get_db_connection
 from app.rag.embedding import embed_text
@@ -48,6 +49,26 @@ def _find_dispute_by_text(cursor, supplier_id: int, text: str):
     )
     return cursor.fetchone()
 
+def _extract_domain(sender: str):
+    if not sender:
+        return None
+    _, email = parseaddr(sender)
+    if "@" not in email:
+        return None
+    return email.split("@", 1)[1].lower()
+
+
+def _supplier_id_by_domain(cursor, sender: str):
+    domain = _extract_domain(sender)
+    if not domain:
+        return None
+    cursor.execute(
+        "SELECT supplier_id FROM suppliers WHERE email_domain = %s",
+        (domain,),
+    )
+    row = cursor.fetchone()
+    return row["supplier_id"] if row else None
+
 
 def _default_supplier_id(cursor) -> int:
     cursor.execute(
@@ -58,7 +79,7 @@ def _default_supplier_id(cursor) -> int:
         ORDER BY supplier_id ASC
         LIMIT 1
         """,
-        ("Unknown Supplier",),
+        ("Test Supplier",),
     )
     row = cursor.fetchone()
     if row:
@@ -71,22 +92,28 @@ def _default_supplier_id(cursor) -> int:
         VALUES (%s)
         RETURNING supplier_id
         """,
-        ("Unknown Supplier",),
+        ("Test Supplier",),
     )
     inserted = cursor.fetchone()
     if inserted:
         return inserted["supplier_id"]
 
-    raise ValueError("Default supplier 'Unknown Supplier' missing and could not be created.")
+    raise ValueError("Default supplier 'Test Supplier' missing and could not be created.")
 
 
-def _resolve_supplier_id(cursor, supplier_id: int) -> int:
+def _resolve_supplier_id(cursor, email: dict) -> int:
+    supplier_id = email.get("supplier_id")
     if supplier_id is not None:
         return supplier_id
+
+    by_domain = _supplier_id_by_domain(cursor, email.get("sender"))
+    if by_domain is not None:
+        return by_domain
+
     resolved = _default_supplier_id(cursor)
     logger.warning(
-        "Missing supplier_id on email; defaulting to 'unknown' supplier",
-        extra={"resolved_supplier_id": resolved},
+        "Missing supplier_id on email; defaulting to configured supplier",
+        extra={"resolved_supplier_id": resolved, "sender": email.get("sender")},
     )
     return resolved
 
@@ -321,7 +348,7 @@ Email Content:
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            supplier_id = _resolve_supplier_id(cur, email.get("supplier_id"))
+            supplier_id = _resolve_supplier_id(cur, email)
             if email.get("supplier_id") is None:
                 email["supplier_id"] = supplier_id
                 cur.execute(

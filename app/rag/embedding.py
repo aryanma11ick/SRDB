@@ -1,7 +1,9 @@
 import os
+import sys
+import db.env
+from pathlib import Path
 from typing import List
 from openai import OpenAI
-
 
 API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:

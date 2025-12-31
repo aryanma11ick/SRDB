@@ -83,6 +83,7 @@ def main():
     results = RetrievalAgent().retrieve_similar_disputes(
         query_text="payment discrepancy",
         top_k=top_k,
+        supplier_id=1,  # No supplier filter
     )
     if not results:
         print("[pipeline] no results returned (do you have any dispute embeddings stored?)")

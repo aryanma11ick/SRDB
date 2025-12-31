@@ -1,7 +1,16 @@
 import os
+import sys
 import json
+from pathlib import Path
 from typing import Dict
-from openai import OpenAI
+
+# Prefer the project's venv site-packages if the caller runs with system Python.
+try:
+    from openai import OpenAI
+except ImportError:
+    venv_site = Path(__file__).resolve().parents[2] / "venv" / "Lib" / "site-packages"
+    sys.path.append(str(venv_site))
+    from openai import OpenAI
 
 from db.db import get_db_connection
 from app.classification.prompts import CLASSIFY_EMAIL_PROMPT

@@ -23,7 +23,7 @@ class RetrievalAgent:
                             e.dispute_id,
                             e.supplier_id,
                             d.document_text,
-                            1 - (e.embedding <=> %s) AS similarity
+                            1 - (e.embedding <=> %s::vector) AS similarity
                         FROM dispute_embeddings e
                         JOIN LATERAL (
                             SELECT document_text
@@ -33,7 +33,7 @@ class RetrievalAgent:
                             LIMIT 1
                         ) d ON TRUE
                         WHERE e.supplier_id = %s
-                        ORDER BY e.embedding <=> %s
+                        ORDER BY e.embedding <=> %s::vector
                         LIMIT %s
                         """,
                         (embedding_literal, supplier_id, embedding_literal, top_k)
@@ -45,7 +45,7 @@ class RetrievalAgent:
                             e.dispute_id,
                             e.supplier_id,
                             d.document_text,
-                            1 - (e.embedding <=> %s) AS similarity
+                            1 - (e.embedding <=> %s::vector) AS similarity
                         FROM dispute_embeddings e
                         JOIN LATERAL (
                             SELECT document_text
@@ -54,7 +54,7 @@ class RetrievalAgent:
                             ORDER BY d.created_at DESC
                             LIMIT 1
                         ) d ON TRUE
-                        ORDER BY e.embedding <=> %s
+                        ORDER BY e.embedding <=> %s::vector
                         LIMIT %s
                         """,
                         (embedding_literal, embedding_literal, top_k)
